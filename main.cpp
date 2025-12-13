@@ -11,11 +11,14 @@ SDL_Renderer* init_window(int windowWidth, int windowHeight);
 
 
 int main() {
-    Game game(20, 20); 
+    Game game(20, 14); 
     SDL_Renderer* renderer = init_window(game.getColumns()*50, game.getRows()*50);
 
     bool running = true;
     SDL_Event event;
+
+    char move = 'u';
+    direction dir = up;
 
     while (running){
         while(SDL_PollEvent(&event)) {
@@ -24,11 +27,29 @@ int main() {
             }
         }
 
+        std::cin >> move;
+
+        switch(move){
+            case('u'):
+                dir = up;
+                break;
+            case('d'):
+                dir = down;
+                break;
+            case('l'):
+                dir = left;
+                break;
+            case('r'):
+                dir = right;
+                break;
+            default:
+                throw std::runtime_error("what is this move!!??");
+        }
 
         drawGrid(game, renderer);
-        if(!game.snake_update(up)) running = false;
+        if(!game.snake_update(dir)) running = false;
 
-        SDL_Delay(150);
+        //SDL_Delay(1590);
 
     }
 
@@ -66,19 +87,19 @@ SDL_Renderer* init_window(int windowWidth, int windowHeight){
         std::cerr << "SDL_Init failed: " << SDL_GetError() << std::endl;
     }
 
-    SDL_Window* window = SDL_CreateWindow("snake game", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowWidth, windowHeight, 0);
+    gWindow = SDL_CreateWindow("snake game", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowWidth, windowHeight, 0);
 
-    if(!window){
+    if(!gWindow){
         std::cerr << "SDL_CreateWindow failed: " << SDL_GetError() << std::endl;
         SDL_Quit();
     }
     
-    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    SDL_Renderer* renderer = SDL_CreateRenderer(gWindow, -1, SDL_RENDERER_ACCELERATED);
 
 
     if (!renderer) {
         std::cerr << "SDL_CreateRenderer failed: " << SDL_GetError() << std::endl;
-        SDL_DestroyWindow(window);
+        SDL_DestroyWindow(gWindow);
         SDL_Quit();
     }
     return renderer;
