@@ -4,13 +4,15 @@
 
 #include "game.h"
 
+SDL_Window* gWindow = nullptr;
+
 void drawGrid(Game game, SDL_Renderer* renderer);
-   
 SDL_Renderer* init_window(int windowWidth, int windowHeight);
+
 
 int main() {
     Game game(20, 20); 
-    SDL_Renderer* renderer = init_window(game.getRows()*50, game.getColumns()*50);
+    SDL_Renderer* renderer = init_window(game.getColumns()*50, game.getRows()*50);
 
     bool running = true;
     SDL_Event event;
@@ -24,15 +26,22 @@ int main() {
 
 
         drawGrid(game, renderer);
+        if(!game.snake_update(up)) running = false;
 
-        SDL_Delay(50);
+        SDL_Delay(150);
 
     }
 
+    std::cout << "you struck a wall!! " << std::endl;
 
-    
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(gWindow);
+    SDL_Quit();
+
+   
     return 0;
 }
+
 
 void drawGrid(Game game, SDL_Renderer* renderer){
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
@@ -50,6 +59,8 @@ void drawGrid(Game game, SDL_Renderer* renderer){
     }
     SDL_RenderPresent(renderer);
 }
+
+
 SDL_Renderer* init_window(int windowWidth, int windowHeight){
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         std::cerr << "SDL_Init failed: " << SDL_GetError() << std::endl;
