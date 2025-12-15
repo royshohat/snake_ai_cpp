@@ -33,8 +33,10 @@ void Game::add_apple(){
 }
 
 bool Game::check_apple(){
-    if (snake_arr.back().row == apple_.row && snake_arr.back().column == apple_.column)
+    if (snake_arr.back().row == apple_.row && snake_arr.back().column == apple_.column){
+        add_apple();
         return true;
+    }
     return false;
 }
 
@@ -67,6 +69,8 @@ bool Game::snake_update(direction dir){
 // returns true if its a valid move
 bool Game::check_for_collision(pos p){
     if(p.row >= rows_ || p.row < 0 || p.column >= columns_ || p.column < 0)
+        return false;
+    if(cells_[p.row][p.column].type == snake)
         return false;
     return true;
 }

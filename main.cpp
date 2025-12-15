@@ -2,6 +2,7 @@
 #include <SDL2/SDL.h>
 #include <vector>
 
+#include "ai.h"
 #include "game.h"
 
 SDL_Window* gWindow = nullptr;
@@ -14,10 +15,13 @@ int main() {
     Game game(20, 14); 
     SDL_Renderer* renderer = init_window(game.getColumns()*50, game.getRows()*50);
 
+
+    Ai brain({game.getRows() * game.getColumns(), 10, 10, 4});
+
+
     bool running = true;
     SDL_Event event;
 
-    char move = 'u';
     direction dir = up;
 
     while (running){
@@ -27,20 +31,38 @@ int main() {
             }
         }
 
-        std::cin >> move;
+        std::vector<float> input_layer;        
+        for(auto& row : game.getCells()){
+            for(auto& cell : row){
+                input_layer.push_back(sigmoid(cell.type));
+            }
+        }
+        std::vector<float> output_layer = brain.think(input_layer);
 
-        switch(move){
-            case('u'):
+        
+        // i will arbitrary say that the first output is up, second is down, third is right, and the fourfe will be left
+
+        int biggest_index = 0;
+        float biggest_output = output_layer[0];
+        for(int i = 1; i!=output_layer.size(); ++i){
+            if (output_layer[i] > biggest_output){
+                biggest_index = i;
+                biggest_output = output_layer[i];
+            } 
+        }
+
+        switch(biggest_index){
+            case(0):
                 dir = up;
                 break;
-            case('d'):
+            case(1):
                 dir = down;
                 break;
-            case('l'):
-                dir = left;
-                break;
-            case('r'):
+            case(2):
                 dir = right;
+                break;
+            case(3):
+                dir = left;
                 break;
             default:
                 throw std::runtime_error("what is this move!!??");
@@ -49,11 +71,11 @@ int main() {
         drawGrid(game, renderer);
         if(!game.snake_update(dir)) running = false;
 
-        //SDL_Delay(1590);
+        SDL_Delay(190);
 
     }
 
-    std::cout << "you struck a wall!! " << std::endl;
+    std::cout << "you failed!!" << std::endl;
 
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(gWindow);
