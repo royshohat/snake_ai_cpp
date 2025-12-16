@@ -8,8 +8,9 @@
 
 #define GAME_ROWS 14
 #define GAME_COLUMNS 20
-#define INPUTS 14
+#define INPUTS 22
 #define GENRENTIONS 100
+#define POPULATION 50
 
 SDL_Window* gWindow = nullptr;
 SDL_Renderer* renderer = nullptr;
@@ -18,6 +19,10 @@ void drawGrid(Game game, SDL_Renderer* renderer);
 float ai_scorer(Ai brain, float generation, bool render);
 SDL_Renderer* init_window(int windowWidth, int windowHeight);
 
+int distance_from_obstcale_up(Game& game);
+int distance_from_obstcale_down(Game& game);
+int distance_from_obstcale_right(Game& game);
+int distance_from_obstcale_left(Game& game);
 
 struct brain_score{
     Ai brain;
@@ -29,11 +34,12 @@ int main() {
 
     renderer = init_window(GAME_COLUMNS*50, GAME_ROWS*50);
 
+    float mutaionStrength = 0.5;
     std::vector<brain_score> brains;
 
     std::cout << "Initializing 50 random brains..." << std::endl;
     for(int i=0; i!=50; ++i){
-        Ai brain({INPUTS, 10, 10, 4}, 0.5);
+        Ai brain({INPUTS, 36, 25, 16, 4});
         brains.emplace_back(std::move(brain), ai_scorer(brain, 0, false));
     }
 
@@ -49,9 +55,9 @@ int main() {
 
 
         for(int i=0; i!=5; ++i){
-            for(int j=5+9*i; j!=5+9*(i+1); ++j){
+            for(int j=5+(50/5-1)*i; j!=5+(50/5-1)*(i+1); ++j){
                 brains[j] = brain_score{Ai(brains[i].brain), 0};
-                brains[j].brain.mutate();
+                brains[j].brain.mutate(mutaionStrength);
             }
         }
         
@@ -63,11 +69,9 @@ int main() {
         }
         
         generation++;
+        //if(mutaionStrength>0.01)mutaionStrength-=.001;
     }
 
-    //SDL_DestroyRenderer(renderer);
-    //SDL_DestroyWindow(gWindow);
-    //SDL_Quit();
 
     
 }
@@ -125,7 +129,8 @@ float ai_scorer(Ai brain, float generation, bool render){
     float distanceX = 0;
     float distanceY = 0;
 
-    
+    direction dir = up;
+
     for(int i=0; i!=10; ++i){
 
         Game game(GAME_COLUMNS, GAME_ROWS); 
@@ -138,7 +143,9 @@ float ai_scorer(Ai brain, float generation, bool render){
             SDL_Event event;
             while(SDL_PollEvent(&event)) {
                 if(event.type == SDL_QUIT) {
-                    // Handle quit if needed
+                    SDL_DestroyRenderer(renderer);
+                    SDL_DestroyWindow(gWindow);
+                    SDL_Quit();
                 }
             }
             SDL_Delay(30);
@@ -147,16 +154,29 @@ float ai_scorer(Ai brain, float generation, bool render){
         while(running){
             std::vector<float> input_layer;        
 
-            input_layer.push_back(game.check_for_collision({game.get_snake_pos().row+1, game.get_snake_pos().column}) ? 0 : 1);            
-            input_layer.push_back(game.check_for_collision({game.get_snake_pos().row-1, game.get_snake_pos().column}) ? 0 : 1);            
-            input_layer.push_back(game.check_for_collision({game.get_snake_pos().row, game.get_snake_pos().column+1}) ? 0 : 1);            
-            input_layer.push_back(game.check_for_collision({game.get_snake_pos().row, game.get_snake_pos().column-1}) ? 0 : 1);            
+            input_layer.push_back(distance_from_obstcale_up(game)/game.getRows());
+            input_layer.push_back(distance_from_obstcale_down(game)/game.getRows());
+            input_layer.push_back(distance_from_obstcale_right(game)/game.getColumns());
+            input_layer.push_back(distance_from_obstcale_left(game)/game.getColumns());
+
+            input_layer.push_back(game.check_for_collision({game.get_snake_pos().row+1, game.get_snake_pos().column}));
+            input_layer.push_back(game.check_for_collision({game.get_snake_pos().row-1, game.get_snake_pos().column}));
+            input_layer.push_back(game.check_for_collision({game.get_snake_pos().row, game.get_snake_pos().column-1}));
+            input_layer.push_back(game.check_for_collision({game.get_snake_pos().row, game.get_snake_pos().column+1}));
+
             input_layer.push_back(game.get_apple_pos().row > game.get_snake_pos().row ? 0 : 1);
             input_layer.push_back(game.get_apple_pos().column > game.get_snake_pos().column ? 0 : 1);
             input_layer.push_back(game.get_apple_pos().row < game.get_snake_pos().row ? 0 : 1);
             input_layer.push_back(game.get_apple_pos().column < game.get_snake_pos().column ? 0 : 1);
+
             input_layer.push_back(game.get_snake_pos().row/game.getRows());
             input_layer.push_back(game.get_snake_pos().column/game.getColumns());
+
+            input_layer.push_back(dir == up ? 1 : 0);
+            input_layer.push_back(dir == down ? 1 : 0);
+            input_layer.push_back(dir == right ? 1 : 0);
+            input_layer.push_back(dir == left ? 1 : 0);
+
 
             input_layer.push_back(distanceX);
             input_layer.push_back(distanceY);
@@ -164,6 +184,10 @@ float ai_scorer(Ai brain, float generation, bool render){
             distanceY = (game.get_snake_pos().column - game.get_apple_pos().column)/game.getColumns();
             input_layer.push_back(distanceX);
             input_layer.push_back(distanceY);
+
+
+            if(INPUTS != input_layer.size())
+                throw std::runtime_error("inputs != inputlayer size");
 
             std::vector<float> output_layer = brain.think(input_layer);
 
@@ -179,7 +203,6 @@ float ai_scorer(Ai brain, float generation, bool render){
                 } 
             }
 
-            direction dir = up;
 
             switch(biggest_index){
                 case(0):
@@ -213,10 +236,10 @@ float ai_scorer(Ai brain, float generation, bool render){
                 }
                 SDL_Delay(30);
             }
-            scoreSum+=0.1;
+            scoreSum+=1;
 
             steps++;
-            if(steps>170) {
+            if(steps>600) {
                 running = false;
                 break;
             }
@@ -224,9 +247,46 @@ float ai_scorer(Ai brain, float generation, bool render){
 
         }
 
-        scoreSum += 100*std::pow(game.snake_size()-4, 3);
+        scoreSum += 10*std::pow(game.snake_size()-4, 3);
     }
     return scoreSum/10;
 
 
+}
+
+int distance_from_obstcale_up(Game& game){
+    int row = game.get_snake_pos().row;
+    int column = game.get_snake_pos().column;
+
+    for(int i = game.get_snake_pos().row-1; i>=0; --i)
+        if(game.getCells()[i][column].type==snake) return row-i;
+    
+    return row+1;
+}
+int distance_from_obstcale_down(Game& game){
+    int row = game.get_snake_pos().row;
+    int column = game.get_snake_pos().column;
+
+    for(int i = game.get_snake_pos().row+1; i!=game.getRows(); ++i)
+        if(game.getCells()[i][column].type==snake) return i-row;
+    
+    return game.getRows()-row;
+}
+int distance_from_obstcale_right(Game& game){
+    int row = game.get_snake_pos().row;
+    int column = game.get_snake_pos().column;
+
+    for(int i = game.get_snake_pos().column+1; i!=game.getColumns(); ++i)
+        if(game.getCells()[row][i].type==snake) return i-column;
+    
+    return game.getColumns() - column;
+}
+int distance_from_obstcale_left(Game& game){
+    int row = game.get_snake_pos().row;
+    int column = game.get_snake_pos().column;
+
+    for(int i = game.get_snake_pos().column-1; i>=0; --i)
+        if(game.getCells()[row][i].type==snake) return column-i;
+    
+    return column+1;
 }

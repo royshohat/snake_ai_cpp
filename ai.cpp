@@ -14,7 +14,7 @@ double randomize_num() { //returns a random number between -1 and 1
     return distrib(gen);
 }
 
-Ai::Ai(std::vector<int> structure, float strength): mutateStrength{strength}{
+Ai::Ai(std::vector<int> structure){
 
     for(int struct_index=1; struct_index !=structure.size(); ++struct_index){ // for every layer
         network.push_back(std::vector<neuron>());
@@ -48,7 +48,7 @@ std::vector<float> Ai::think(std::vector<float>& inputs){
     return layers.back();
 }
 
-void Ai::mutate(){
+void Ai::mutate(float mutateStrength){
     for(auto layer_index = 1; layer_index != network.size(); ++layer_index){
         for(auto node_index = 0; node_index != network[layer_index].size(); ++node_index){
             for(auto weights_index=0; weights_index != network[layer_index][node_index].weights.size(); ++weights_index){
