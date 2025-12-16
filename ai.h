@@ -12,10 +12,12 @@ struct neuron{
 class Ai{
 
     std::vector<std::vector<neuron>> network;
+    float mutateStrength;
 
 public:
 
-    Ai(std::vector<int> structure);
+    Ai(std::vector<int> structure, float strength);
     std::vector<float> think(std::vector<float>& inputs);
+    void mutate();
 
 };

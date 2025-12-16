@@ -1,5 +1,25 @@
 #include "game.h"
 
+
+Game::Game(int columns, int rows) : rows_(rows), columns_(columns) {
+    cells_.resize(rows_, std::vector<Cell>(columns_));
+
+    for (int i=0; i!=rows_; ++i){
+        for (int j=0; j!=columns_; ++j){
+            cells_[i][j] = {empty, {j*50, i*50, 50, 50}, {i, j}};
+        }
+    }
+    snake_push_back({9, 5});
+    snake_push_back({9, 6});
+    snake_push_back({9, 7});
+    snake_push_back({9, 8});
+    snake_push_back({9, 9});
+
+    add_apple();
+}
+
+
+
 void Game::snake_push_back(pos p){
     snake_arr.push_back(cells_[p.row][p.column]);
     snake_arr.back().type = snake;
@@ -7,8 +27,8 @@ void Game::snake_push_back(pos p){
 }
 
 void Game::snake_remove_tail(){
-    int tailRow = snake_arr.begin()->row;
-    int tailColumn = snake_arr.begin()->column;
+    int tailRow = snake_arr.begin()->position.row;
+    int tailColumn = snake_arr.begin()->position.column;
     cells_[tailRow][tailColumn].type = empty;
     snake_arr.erase(snake_arr.begin());
 }
@@ -28,12 +48,12 @@ void Game::add_apple(){
     int random_index = distrib(gen);
 
     empty_cells[random_index]->type = apple;
-    apple_.row = empty_cells[random_index]->row;
-    apple_.column = empty_cells[random_index]->column;
+    apple_.row = empty_cells[random_index]->position.row;
+    apple_.column = empty_cells[random_index]->position.column;
 }
 
 bool Game::check_apple(){
-    if (snake_arr.back().row == apple_.row && snake_arr.back().column == apple_.column){
+    if (snake_arr.back().position.row == apple_.row && snake_arr.back().position.column == apple_.column){
         add_apple();
         return true;
     }
@@ -42,7 +62,7 @@ bool Game::check_apple(){
 
 bool Game::snake_update(direction dir){
     if(!check_apple()) snake_remove_tail();
-    pos currentPos = {snake_arr.back().row, snake_arr.back().column};
+    pos currentPos = snake_arr.back().position;
     pos newPos = currentPos;
 
     switch(dir){
@@ -74,4 +94,3 @@ bool Game::check_for_collision(pos p){
         return false;
     return true;
 }
-

@@ -1,90 +1,73 @@
 #include <iostream>
 #include <SDL2/SDL.h>
 #include <vector>
+#include <algorithm>
 
 #include "ai.h"
 #include "game.h"
 
+#define GAME_ROWS 14
+#define GAME_COLUMNS 20
+#define INPUTS 14
+#define GENRENTIONS 100
+
 SDL_Window* gWindow = nullptr;
+SDL_Renderer* renderer = nullptr;
 
 void drawGrid(Game game, SDL_Renderer* renderer);
+float ai_scorer(Ai brain, float generation, bool render);
 SDL_Renderer* init_window(int windowWidth, int windowHeight);
 
 
+struct brain_score{
+    Ai brain;
+    float score;
+};
+
 int main() {
-    Game game(20, 14); 
-    SDL_Renderer* renderer = init_window(game.getColumns()*50, game.getRows()*50);
 
+    renderer = init_window(GAME_COLUMNS*50, GAME_ROWS*50);
 
-    Ai brain({game.getRows() * game.getColumns(), 10, 10, 4});
+    std::vector<brain_score> brains;
 
-
-    bool running = true;
-    SDL_Event event;
-
-    direction dir = up;
-
-    while (running){
-        while(SDL_PollEvent(&event)) {
-            if(event.type == SDL_QUIT) {
-                running = false;
-            }
-        }
-
-        std::vector<float> input_layer;        
-        for(auto& row : game.getCells()){
-            for(auto& cell : row){
-                input_layer.push_back(sigmoid(cell.type));
-            }
-        }
-        std::vector<float> output_layer = brain.think(input_layer);
-
-        
-        // i will arbitrary say that the first output is up, second is down, third is right, and the fourfe will be left
-
-        int biggest_index = 0;
-        float biggest_output = output_layer[0];
-        for(int i = 1; i!=output_layer.size(); ++i){
-            if (output_layer[i] > biggest_output){
-                biggest_index = i;
-                biggest_output = output_layer[i];
-            } 
-        }
-
-        switch(biggest_index){
-            case(0):
-                dir = up;
-                break;
-            case(1):
-                dir = down;
-                break;
-            case(2):
-                dir = right;
-                break;
-            case(3):
-                dir = left;
-                break;
-            default:
-                throw std::runtime_error("what is this move!!??");
-        }
-
-        drawGrid(game, renderer);
-        if(!game.snake_update(dir)) running = false;
-
-        SDL_Delay(190);
-
+    for(int i=0; i!=50; ++i){
+        Ai brain({INPUTS, 10, 10, 4}, 0.5);
+        brains.emplace_back(std::move(brain), ai_scorer(brain, 0, 0));
     }
 
-    std::cout << "you failed!!" << std::endl;
+    int generation = 0;
 
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(gWindow);
-    SDL_Quit();
+    while(true){
+        std::sort(brains.begin(), brains.end(), [](const brain_score& a, const brain_score& b) {
+            return a.score > b.score;
+        });
 
-   
-    return 0;
+    std::cout << "Generation " << generation << " | Best score: "
+                  << brains[0].score << std::endl;
+
+
+        for(int i=0; i!=5; ++i){
+            for(int j=5+9*i; j!=5+9*(i+1); ++j){
+                brains[j] = brain_score{Ai(brains[i].brain), 0};
+                brains[j].brain.mutate();
+            }
+        }
+        
+        bool render = generation%100 == 0;
+
+        for(auto& brain : brains){
+            brain.score = ai_scorer(brain.brain, generation, render);
+        }
+        
+        generation++;
+    }
+
+    //SDL_DestroyRenderer(renderer);
+    //SDL_DestroyWindow(gWindow);
+    //SDL_Quit();
+
+    
 }
-
 
 void drawGrid(Game game, SDL_Renderer* renderer){
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
@@ -125,5 +108,102 @@ SDL_Renderer* init_window(int windowWidth, int windowHeight){
         SDL_Quit();
     }
     return renderer;
+
+}
+
+
+// takes Ai and returns an avrage score after 10 games
+float ai_scorer(Ai brain, float generation, bool render){
+
+    bool running = true;
+
+    float scoreSum = 0;
+    float steps = 0;
+    float distanceX = 0;
+    float distanceY = 0;
+
+    
+    for(int i=0; i!=10; ++i){
+
+        Game game(GAME_COLUMNS, GAME_ROWS); 
+
+
+        while(running){
+
+            std::vector<float> input_layer;        
+
+            input_layer.push_back(game.check_for_collision({game.get_snake_pos().row+1, game.get_snake_pos().column}) ? 0 : 1);            
+            input_layer.push_back(game.check_for_collision({game.get_snake_pos().row-1, game.get_snake_pos().column}) ? 0 : 1);            
+            input_layer.push_back(game.check_for_collision({game.get_snake_pos().row, game.get_snake_pos().column+1}) ? 0 : 1);            
+            input_layer.push_back(game.check_for_collision({game.get_snake_pos().row, game.get_snake_pos().column-1}) ? 0 : 1);            
+            input_layer.push_back(game.get_apple_pos().row > game.get_snake_pos().row ? 0 : 1);
+            input_layer.push_back(game.get_apple_pos().column > game.get_snake_pos().column ? 0 : 1);
+            input_layer.push_back(game.get_apple_pos().row < game.get_snake_pos().row ? 0 : 1);
+            input_layer.push_back(game.get_apple_pos().column < game.get_snake_pos().column ? 0 : 1);
+            input_layer.push_back(game.get_snake_pos().row/game.getRows());
+            input_layer.push_back(game.get_snake_pos().column/game.getColumns());
+
+            input_layer.push_back(distanceX);
+            input_layer.push_back(distanceY);
+            distanceX = (game.get_snake_pos().row - game.get_apple_pos().row)/game.getRows();
+            distanceY = (game.get_snake_pos().column - game.get_apple_pos().column)/game.getColumns();
+            input_layer.push_back(distanceX);
+            input_layer.push_back(distanceY);
+
+            std::vector<float> output_layer = brain.think(input_layer);
+
+            
+            // i will arbitrary say that the first output is up, second is down, third is right, and the fourth will be left
+
+            int biggest_index = 0;
+            float biggest_output = output_layer[0];
+            for(int i = 1; i!=output_layer.size(); ++i){
+                if (output_layer[i] > biggest_output){
+                    biggest_index = i;
+                    biggest_output = output_layer[i];
+                } 
+            }
+
+            direction dir = up;
+
+            switch(biggest_index){
+                case(0):
+                    dir = up;
+                    break;
+                case(1):
+                    dir = down;
+                    break;
+                case(2):
+                    dir = right;
+                    break;
+                case(3):
+                    dir = left;
+                    break;
+                default:
+                    throw std::runtime_error("what is this move!!??");
+            }
+
+            if(render){
+                drawGrid(game, renderer);
+                SDL_Delay(30);
+                return scoreSum;
+            }
+
+            if(!game.snake_update(dir)) running = false;
+            scoreSum+=0.1;
+
+            steps++;
+            if(steps>70) break;
+            if(game.check_apple()) steps = 0;
+
+        }
+
+
+        scoreSum += 100*std::pow(game.snake_size()-4, 3);
+        running = true;
+        steps = 0;
+    }
+    return scoreSum/10;
+
 
 }
