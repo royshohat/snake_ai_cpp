@@ -22,6 +22,7 @@ SDL_Renderer* init_window(int windowWidth, int windowHeight);
 struct brain_score{
     Ai brain;
     float score;
+    brain_score(Ai b, float s) : brain(std::move(b)), score(s) {}
 };
 
 int main() {
@@ -30,9 +31,10 @@ int main() {
 
     std::vector<brain_score> brains;
 
+    std::cout << "Initializing 50 random brains..." << std::endl;
     for(int i=0; i!=50; ++i){
         Ai brain({INPUTS, 10, 10, 4}, 0.5);
-        brains.emplace_back(std::move(brain), ai_scorer(brain, 0, 0));
+        brains.emplace_back(std::move(brain), ai_scorer(brain, 0, false));
     }
 
     int generation = 0;
@@ -42,7 +44,7 @@ int main() {
             return a.score > b.score;
         });
 
-    std::cout << "Generation " << generation << " | Best score: "
+        std::cout << "Generation " << generation << " | Best score: "
                   << brains[0].score << std::endl;
 
 
@@ -55,8 +57,9 @@ int main() {
         
         bool render = generation%100 == 0;
 
-        for(auto& brain : brains){
-            brain.score = ai_scorer(brain.brain, generation, render);
+        for(int i = 0; i < brains.size(); ++i){
+            bool should_render = render && (i == 0); // Only render the first brain when rendering
+            brains[i].score = ai_scorer(brains[i].brain, generation, should_render);
         }
         
         generation++;
@@ -126,10 +129,22 @@ float ai_scorer(Ai brain, float generation, bool render){
     for(int i=0; i!=10; ++i){
 
         Game game(GAME_COLUMNS, GAME_ROWS); 
+        running = true;
+        steps = 0;
+        bool should_render_this_game = render && (i == 0); // Only render the first game
 
+        if(should_render_this_game){
+            drawGrid(game, renderer);
+            SDL_Event event;
+            while(SDL_PollEvent(&event)) {
+                if(event.type == SDL_QUIT) {
+                    // Handle quit if needed
+                }
+            }
+            SDL_Delay(30);
+        }
 
         while(running){
-
             std::vector<float> input_layer;        
 
             input_layer.push_back(game.check_for_collision({game.get_snake_pos().row+1, game.get_snake_pos().column}) ? 0 : 1);            
@@ -183,25 +198,33 @@ float ai_scorer(Ai brain, float generation, bool render){
                     throw std::runtime_error("what is this move!!??");
             }
 
-            if(render){
-                drawGrid(game, renderer);
-                SDL_Delay(30);
-                return scoreSum;
+            if(!game.snake_update(dir)) {
+                running = false;
+                break;
             }
 
-            if(!game.snake_update(dir)) running = false;
+            if(should_render_this_game){
+                drawGrid(game, renderer);
+                SDL_Event event;
+                while(SDL_PollEvent(&event)) {
+                    if(event.type == SDL_QUIT) {
+                        // Handle quit if needed
+                    }
+                }
+                SDL_Delay(30);
+            }
             scoreSum+=0.1;
 
             steps++;
-            if(steps>70) break;
+            if(steps>170) {
+                running = false;
+                break;
+            }
             if(game.check_apple()) steps = 0;
 
         }
 
-
         scoreSum += 100*std::pow(game.snake_size()-4, 3);
-        running = true;
-        steps = 0;
     }
     return scoreSum/10;
 
